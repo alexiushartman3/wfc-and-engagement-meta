@@ -1,0 +1,136 @@
+---
+title: "Sample Cross-Sectional Meta-analysis"
+author: "Lexi Strasburg"
+date: "9/25/2022"
+output: html_document
+---
+
+This example code was developed using the psychmeta tutorial from Dahlke & Wiernik (https://cran.r-project.org/web/packages/psychmeta/vignettes/overview.html). Includes example for WFC-Overall Engagement psychometric meta-analysis with example data, test of one moderator, and sensitvity analyses.
+
+## Install & Load Packages
+```{r}
+#install.packages("here")
+#install.packages("psychmeta")
+#install.packages("metafor")
+#install.packages("readr")
+#install.packages("dplyr")
+#install.packages("kableExtra")
+```
+
+```{r}
+library(here)
+library(psychmeta)
+library(metafor)
+library(readr)
+library(dplyr)
+library(kableExtra)
+```
+
+# Read in Data
+```{r}
+wfc.ee_meta = read_csv(here("Data", "Sample Data.csv"), show_col_types = FALSE)
+```
+
+# Select Columns
+```{r}
+wfc.ee_meta <- select(wfc.ee_meta, c(Study_Number, Short_Citation, N, Relationship_Filter, Ryy_Predictor,	Ryy_Criterion, Rxy, EE_Scale))
+```
+
+```{r echo=FALSE}
+wfc.ee_meta %>% 
+  dplyr::select(Study_Number, Short_Citation, N, Relationship_Filter, Ryy_Predictor,	Ryy_Criterion, Rxy) %>%
+  knitr::kable() %>%
+    kableExtra::kable_styling(full_width = FALSE) %>%
+  scroll_box(width = "700px", height = "200px")
+```
+
+Filter for WFC - OE
+```{r}
+WFOE <- wfc.ee_meta %>%
+  filter(Relationship_Filter == "work.to.family_overall.engagement")
+```
+
+# Run Psychometric Meta-Analysis
+```{r}
+meta_model1 <- ma_r(ma_method = "ad", 
+                    rxyi = Rxy, 
+                    n = N, 
+                    rxx = Ryy_Predictor, 
+                    ryy = Ryy_Criterion,
+                    correct_rr_x = TRUE, 
+                    correct_rr_y = TRUE,
+                    sample_id = Study_Number, 
+                    data = WFOE)
+```
+
+```{r}
+meta_model1$meta_tables$`analysis_id: 1`$artifact_distribution[1]
+```
+
+## Moderator: Employee Engagement Scale
+```{r}
+meta_model2 <- ma_r(ma_method = "ad", 
+                    rxyi = Rxy, 
+                    n = N, 
+                    rxx = Ryy_Predictor, 
+                    ryy = Ryy_Criterion,
+                    correct_rr_x = TRUE, 
+                    correct_rr_y = TRUE,
+                    moderators = EE_Scale,
+                    sample_id = Study_Number, 
+                    data = wfc.ee_meta)
+```
+
+```{r}
+summary(meta_model2)
+```
+
+## Sensitivity Analyses
+```{r}
+ma_obj <- sensitivity(meta_model1,
+                      leave1out = TRUE,
+                      cumulative = TRUE,
+                      sort_method = "weight")
+```
+
+# Egger's Test
+```{r}
+meta.data.es <- escalc(measure = "COR",
+                       ni = N,
+                       ri = Rxy,
+                       data = WFOE)
+```
+
+```{r}
+res <- rma(yi = yi, vi = vi, data = meta.data.es) 
+regtest(res)
+```
+
+# Funnel Plot
+```{r}
+ma_obj <- plot_funnel(ma_obj = ma_obj)
+out_plots <- get_plots(ma_obj)
+out_plots$funnel$`analysis id: 1`$barebones
+```
+
+# Cumulative Meta-Analysis
+```{r}
+out_cumulative <- get_cumulative(ma_obj)
+out_cumulative$`analysis id: 1`$barebones
+```
+
+```{r}
+out_plots <- get_plots(ma_obj)
+out_plots$cumulative$`analysis id: 1`$barebones$plots
+```
+
+# Leave One Out
+```{r}
+out_leave1out <- get_leave1out(ma_obj)
+out_leave1out$`analysis id: 1`$barebones
+```
+
+```{r}
+out_plots <- get_plots(ma_obj)
+out_plots$leave1out$`analysis id: 1`$barebones$plots
+```

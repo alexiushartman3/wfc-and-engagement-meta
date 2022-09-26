@@ -1,0 +1,158 @@
+---
+title: "Sample CoTiMa"
+author: "Lexi Strasburg"
+date: "9/22/2022"
+output: html_document
+---
+This code was developed using the CoTiMa user guide from Dormann & Homberg (https://cran.r-project.org/web/packages/CoTiMA/vignettes/CoTiMA_User_Guide.pdf). Includes example for WFC-EE CoTiMa with example data, test of one moderator, and sensitivity analyses.
+Note: the ctmaInit & ctmaFit functions produce a lot of output. Brief notes regarding interpretation are provided under these sections.
+
+## Install & Load Packages
+```{r}
+#install.packages("devtools")
+#install.packages("CoTiMA")
+#install.packages("openxlsx")
+```
+
+```{r}
+library("devtools")
+library("CoTiMA")
+library("openxlsx")
+```
+
+Example Code for WFC & EE CoTiMa
+
+## Load Sample Data & Correct for Measurement Error 
+```{r}
+#Study 1
+empcov1 <- matrix(c(1.00, 0.45, 0.57, 0.18,
+                    0.45, 1.00, 0.31, 0.66,
+                    0.57, 0.31, 1.00, 0.40,
+                    0.18, 0.66, 0.40, 1.00), nrow=4, ncol=4)
+delta_t1 <- .5
+alphas1 <- c(.87, .88, .80, .94)
+empcov1 <- ctmaCorRel(empcov1, alphas1)
+variableNames1 <- c("WFC1", "EE1", "WFC2", "EE2")
+dimnames(empcov1) <- list(variableNames1, variableNames1)
+sampleSize1 <- 40
+eeScale1 <- c("Utrecht")
+nationality1 <- c("USA")
+per_fem1 <- .60
+age1 <- 32.0
+hours1 <- 38.8
+source1 <- c("1. A. Author & B. Author (2022)")
+moderator1 <- c(1, 1, .60, 32, 38.8)
+
+#Study 2
+empcov2 <- matrix(c(1.00, 0.43, 0.71, 0.37,
+                    0.43, 1.00, 0.34, 0.69,
+                    0.71, 0.34, 1.00, 0.50,
+                    0.37, 0.69, 0.50, 1.00), nrow=4, ncol=4)
+delta_t2 <- 10
+alphas2 <- c(.91, .88, .95, .81)
+empcov2 <- ctmaCorRel(empcov2, alphas2)
+variableNames2 <- c("WFC1", "EE1", "WFC2", "EE2")
+dimnames(empcov2) <- list(variableNames2, variableNames2)
+sampleSize2 <- 102
+eeScale2 <- c("Utrecht")
+nationality2 <- c("CA")
+per_fem2 <- .48
+age2 <- 28.4
+hours2 <- 39.1
+source2 <- c("2. A. Author & B. Author (2019)")
+moderator2 <- c(1, 2, .48, 28.4, 39.1)
+
+#Study 3
+empcov3 <- matrix(c(1.00, 0.38, 0.54, 0.34, 0.60, 0.28,
+                      0.38, 1.00, 0.34, 0.68, 0.28, 0.68,
+                      0.54, 0.34, 1.00, 0.47, 0.66, 0.39,
+                      0.34, 0.68, 0.47, 1.00, 0.38, 0.72,
+                      0.60, 0.28, 0.66, 0.38, 1.00, 0.38,
+                      0.28, 0.68, 0.39, 0.72, 0.38, 1.00), nrow=6, ncol=6)
+delta_t3 <- c(20,20)
+alphas3 <- c(.70, .88, .90, .92, .91, .90)
+empcov3 <- ctmaCorRel(empcov3, alphas3)
+variableNames3 <- c("WFC1", "EE1", "WFC2", "EE2", "WFC3", "EE3")
+dimnames(empcov3) <- list(variableNames3, variableNames3)
+sampleSize3 <- 40
+eeScale3 <- c("Saks")
+nationality3 <- c("USA")
+per_fem3 <- .55
+age3 <- 37.8
+hours3 <- 41.0
+source3 <- c("3. A. Author (2018)")
+moderator3 <- c(2, 1, .55, 37.8, 41.0)
+```
+
+## Compile Studies To List
+```{r}
+activeDirectory <- "C:/Users/lexic/OneDrive/Dissertation/Sample Meta-Analysis Code"
+CoTiMAstudyList_3 <- ctmaPrep(selectedStudies=c(1, 2, 3),
+                                  activeDirectory = activeDirectory,
+                                  addElements = c("work-to-family conflict", "engagement"),
+                                  moderatorLabels=c("EE Scale", "Nationality", "Percent Female", "Age", "Work Hours"),
+                                  moderatorValues=list(c("1 = Utrecht",
+                                                         "2 = Saks"), c("1 = US", "2 = Canada"), "continuous", "continuous", "continuous"))
+```
+
+# Create Excel Spreadsheet with Study Information
+```{r}
+openXL(CoTiMAstudyList_3$excelSheets)
+saveWorkbook(CoTiMAstudyList_3$excelSheets, overwrite=TRUE,
+file=paste0(activeDirectory, "myExcelSheet.xlsx") )
+```
+
+## Initial Fit of CTSEM Model to Each Study
+```{r}
+activeDirectory <- "C:/Users/lexic/OneDrive/Dissertation/Sample Meta-Analysis Code"
+coresToUse = 1 
+
+CoTiMAInitFit_3 <- ctmaInit(primaryStudies=CoTiMAstudyList_3,
+                                n.latent = 2,
+                                activeDirectory = activeDirectory,
+                                scaleTime = 1/20,
+                                finishsamples = 20000,
+                                checkSingleStudyResults = FALSE)
+
+summary(CoTiMAInitFit_3)
+saveRDS(CoTiMAInitFit_3, paste0(activeDirectory, "CoTiMAInitFit_3.rds"))
+```
+Auto and cross effects are found in "Estimates" section. These will be combined in next step to provide meta-analytic estimates.
+
+# Full CoTiMA (Work-to-Family Conflict & Engagement)
+```{r}
+CoTiMAFullFit_3 <- ctmaFit(ctmaInitFit = CoTiMAInitFit_3, 
+                               coresToUse = coresToUse)
+summary(CoTiMAFullFit_3)
+```
+Note: examine the Upper & Lower Level CIs for DRIFT V1toV2 (invariant) and DRIFT V1toV2 (invariant) to test hypotheses.
+
+## Plot Full CoTiMa
+```{r}
+plot(ctmaFitList(CoTiMAFullFit_3),
+     timeUnit="Days",
+     timeRange=c(.5, 20, 1) )
+```
+
+## Heterogenity & Publication Bias
+```{r}
+CoTiMABiG_D_BO <- ctmaBiG(CoTiMAInitFit_3)
+summary(CoTiMABiG_D_BO)
+plot(CoTiMABiG_D_BO)
+```
+
+## Moderated Full CoTiMa (Single Continuous Moderator)
+```{r}
+CoTiMAMod5onFullFit_3 <- ctmaFit(ctmaInitFit = CoTiMAInitFit_3,
+mod.number = 5,
+mod.type = "cont",
+mod.names = "Work Hours",
+coresToUse = 1,
+scaleMod = TRUE)
+saveRDS(CoTiMAMod5onFullFit_3, file=paste0(activeDirectory,
+"CoTiMAMod5onFullFit_3.rds"))
+summary(CoTiMAMod5onFullFit_3)
+```
+Note: examine the Upper & Lower CIs to reveal significance of moderator.
+
+
